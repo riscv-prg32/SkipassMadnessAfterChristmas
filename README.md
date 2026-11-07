@@ -11,7 +11,7 @@ The six selectable routes use the real piste-area names Aremogna, Pallottieri, G
 - A: sharp carve
 - Start: begin or return to the title
 
-Network consoles in the same PRG32 multiplayer room appear as orange rivals. Music is limited to title/attract, win and game-over screens; downhill play uses stereo collision and gate effects.
+Network consoles in the same PRG32 multiplayer room appear as orange rivals. Music is limited to title/attract, win and game-over screens; downhill play uses stereo ski-surface, carving, mogul, collision and gate effects. The scene uses a high-contrast rear-view skier, perspective gates and moguls, layered snow-capped mountains, lift cables, gondolas and snow-covered conifers.
 
 ## Build
 
