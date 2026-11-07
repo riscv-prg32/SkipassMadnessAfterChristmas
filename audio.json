@@ -1,0 +1,14 @@
+{
+  "instruments": [
+    {"synth":{"wave":"pulse","pulse_width":92,"filter_cutoff":210,"filter_resonance":36},"default_volume":150,"default_pan":-48,"attack":3,"decay":45,"sustain":150,"release":50},
+    {"synth":{"wave":"triangle","filter_cutoff":180},"default_volume":135,"default_pan":48,"attack":8,"decay":65,"sustain":170,"release":60},
+    {"synth":{"wave":"saw","filter_cutoff":145,"filter_resonance":48},"default_volume":125,"default_pan":-20,"attack":2,"decay":50,"sustain":120,"release":40},
+    {"synth":{"wave":"noise","filter_cutoff":95},"default_volume":80,"default_pan":35,"attack":0,"decay":20,"sustain":0,"release":18},
+    {"synth":{"wave":"noise","filter_cutoff":65},"default_volume":170,"default_pan":0,"attack":0,"decay":35,"sustain":0,"release":20}
+  ],
+  "tracks": [
+    {"events":[{"delta":0,"command":"SET_TEMPO","arg0":138},{"delta":0,"command":"NOTE_ON","arg0":0,"arg1":60},{"delta":0,"command":"NOTE_ON","arg0":1,"arg1":67},{"delta":2,"command":"NOTE_OFF","arg0":0},{"delta":0,"command":"NOTE_ON","arg0":0,"arg1":64},{"delta":2,"command":"NOTE_OFF","arg0":1},{"delta":0,"command":"NOTE_ON","arg0":1,"arg1":69},{"delta":2,"command":"NOTE_OFF","arg0":0},{"delta":0,"command":"NOTE_ON","arg0":0,"arg1":67},{"delta":2,"command":"NOTE_OFF","arg0":0},{"delta":0,"command":"NOTE_OFF","arg0":1},{"delta":0,"command":"JUMP","arg0":0,"arg1":0}]},
+    {"events":[{"delta":0,"command":"SET_TEMPO","arg0":156},{"delta":0,"command":"NOTE_ON","arg0":0,"arg1":72},{"delta":0,"command":"NOTE_ON","arg0":1,"arg1":76},{"delta":2,"command":"NOTE_ON","arg0":2,"arg1":79},{"delta":3,"command":"NOTE_OFF","arg0":0},{"delta":0,"command":"NOTE_OFF","arg0":1},{"delta":0,"command":"NOTE_OFF","arg0":2},{"delta":1,"command":"JUMP","arg0":0,"arg1":0}]},
+    {"events":[{"delta":0,"command":"SET_TEMPO","arg0":88},{"delta":0,"command":"NOTE_ON","arg0":1,"arg1":45},{"delta":2,"command":"NOTE_OFF","arg0":1},{"delta":0,"command":"NOTE_ON","arg0":1,"arg1":41},{"delta":3,"command":"NOTE_OFF","arg0":1},{"delta":1,"command":"JUMP","arg0":0,"arg1":0}]}
+  ]
+}
