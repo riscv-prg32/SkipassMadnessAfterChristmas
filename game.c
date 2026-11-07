@@ -10,6 +10,8 @@
 #define ROOM "skipass-madness-roccaraso-v1"
 #define RUN_MS 75000u
 #define OBJ_N 28
+#define OBJ_SPACING 65
+#define OBJ_LOOP (OBJ_N * OBJ_SPACING)
 #define CI(r,g,b) ((uint8_t)(16 + 36*(r) + 6*(g) + (b)))
 enum { TITLE, ATTRACT, PLAY, CRASH, WIN, OVER };
 enum { P_SKY=8, P_SKY2, P_FAR, P_MID, P_SNOW, P_SHADE, P_TREE, P_DARK,
@@ -61,7 +63,13 @@ static void build_skier(void){
 }
 static void music_play(int track){music_stop();prg32_audio_play_track((uint8_t)track);g.music=1;}
 static void set_mode(int m){g.mode=m;g.mode_ms=prg32_ticks_ms();if(m==TITLE||m==ATTRACT)music_play(0);else if(m==WIN)music_play(1);else if(m==OVER)music_play(2);else music_stop();}
-static void objects(void){for(int i=0;i<OBJ_N;i++){g.obj[i].y=(int16_t)(80+i*65+(rnd()%34));g.obj[i].lane=(uint8_t)(rnd()%7);g.obj[i].x=(int16_t)(34+g.obj[i].lane*42);g.obj[i].kind=(uint8_t)(i%5==0?2:(i%3==0?1:0));}}
+static void place_object(obstacle_t *object,int y,int sequence){
+  object->y=(int16_t)y;
+  object->lane=(uint8_t)(rnd()%7);
+  object->x=(int16_t)(34+object->lane*42);
+  object->kind=(uint8_t)(sequence%5==0?2:(sequence%3==0?1:0));
+}
+static void objects(void){for(int i=0;i<OBJ_N;i++)place_object(&g.obj[i],80+i*OBJ_SPACING+(int)(rnd()%34),i);}
 static void begin_run(void){g.x=160;g.speed=3;g.distance=0;g.score=0;g.gates=0;g.lives=3;g.combo=1;g.start_ms=prg32_ticks_ms();g.last_ms=g.start_ms;g.seed=0x5a17u+(uint32_t)g.course*997u;objects();set_mode(PLAY);}
 static void impact(int note){prg32_audio_set_channel_pan(6,(int8_t)((g.x-160)*90/160));prg32_audio_note(6,4,(uint8_t)note,180,130);}
 
@@ -78,7 +86,9 @@ static void update_play(uint32_t now,uint32_t in,uint32_t press){
   if(now-g.last_ms>=33){g.last_ms=now;g.distance+=g.speed;g.score+=g.speed*g.combo;}
   for(int i=0;i<OBJ_N;i++){
     int sy=ROAD_Y+g.obj[i].y-g.distance;
-    if(sy>212){g.obj[i].y+=(int16_t)(OBJ_N*65);g.obj[i].lane=(uint8_t)(rnd()%7);g.obj[i].x=(int16_t)(34+g.obj[i].lane*42);}
+    /* Downhill motion moves scenery towards the top of the display. Recycle
+     * an object after it passes the horizon, preserving a continuous piste. */
+    if(sy<60){place_object(&g.obj[i],g.obj[i].y+OBJ_LOOP,i+(g.distance/OBJ_LOOP)*OBJ_N);continue;}
     if(sy>=154&&sy<=186&&absi(g.x-g.obj[i].x)<14){
       if(g.obj[i].kind==2){g.gates++;g.combo=clampi(g.combo+1,1,5);g.score+=250*g.combo;impact(84);}
       else {g.lives--;g.combo=1;impact(g.obj[i].kind?38:48);g.obj[i].y-=80;if(g.lives<=0)set_mode(OVER);else set_mode(CRASH);return;}
@@ -111,4 +121,4 @@ static void hud(void){char b[7];box(0,0,W,18,P_PANEL);txt(4,5,course_name[g.cour
 static void slope(void){mountains();for(int i=0;i<OBJ_N;i++){int y=ROAD_Y+g.obj[i].y-g.distance;if(y<68||y>205)continue;if(g.obj[i].kind==2)gate(g.obj[i].x,y);else if(g.obj[i].kind==1)rock(g.obj[i].x,y);else tree(g.obj[i].x,y,18);}for(int y=90;y<200;y+=26){int off=(g.distance/2+y*3)%97;box(off, y,18,2,P_SHADE);box(250-off/2,y+8,12,1,P_ICE);}draw_peers();prg32_sprite_draw_indexed(g.x-6,166,&skier,(uint32_t)((g.distance/20)&1));hud();}
 static void title(void){mountains();box(18,21,284,72,P_PANEL);center(30,"SKIPASS MADNESS",CI(5,5,0),CI(0,1,2));center(43,"AFTER CHRISTMAS",CI(5,2,0),CI(0,1,2));center(63,"ROCCARASO - ABRUZZO",CI(5,5,5),CI(0,1,2));tree(32,151,32);tree(286,155,38);center(112,course_name[g.course],CI(0,2,5),CI(5,5,5));center(130,"LEFT/RIGHT SELECT PISTE",CI(1,1,1),CI(5,5,5));center(145,"A OR START TO SKI",CI(5,0,0),CI(5,5,5));center(174,g.mode==ATTRACT?"ATTRACT MODE - JOIN THE RACE":"NETWORK RACERS ENABLED",CI(0,3,2),CI(5,5,5));}
 static void result(const char *head,const char *sub){slope();box(36,55,248,82,P_PANEL);center(67,head,CI(5,5,0),CI(0,1,2));center(86,sub,CI(5,5,5),CI(0,1,2));char b[7];num(b,g.score,6);center(104,b,CI(5,2,0),CI(0,1,2));center(122,"A RETRY   B TITLE",CI(3,5,5),CI(0,1,2));}
-void skipass_madness_draw(void){if(g.mode==TITLE||g.mode==ATTRACT)title();else if(g.mode==PLAY||g.mode==CRASH)slope();else if(g.mode==WIN)result("PISTE CONQUERED!","APRÈS-SKI AT AREMOGNA");else result("SKIPASS EXPIRED","THE MOUNTAIN WINS");if(g.mode==CRASH){box(70,82,180,34,P_PANEL);center(94,"SNOWBANK!",CI(5,2,0),CI(0,1,2));}}
+void skipass_madness_draw(void){if(g.mode==TITLE||g.mode==ATTRACT)title();else if(g.mode==PLAY||g.mode==CRASH)slope();else if(g.mode==WIN)result("PISTE CONQUERED!",course_name[g.course]);else result("SKIPASS EXPIRED","THE MOUNTAIN WINS");if(g.mode==CRASH){box(70,82,180,34,P_PANEL);center(94,"SNOWBANK!",CI(5,2,0),CI(0,1,2));}}
