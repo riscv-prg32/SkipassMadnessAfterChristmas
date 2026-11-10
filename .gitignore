@@ -54,3 +54,6 @@ dkms.conf
 # debug information files
 *.dwo
 build/
+
+# Store staging copy (rebuilt by build.sh)
+store-bundle/
