@@ -6,16 +6,22 @@ An original 320×200 PRG32 downhill skiing cartridge set in the Roccaraso / Alto
 
 ## The game
 
-A drone-follow camera behind the skier shows the piste in 2.5D. It is not a road racer: the screen is built from the piste's real altitude profile. Crests hide the slope beyond them, steep pitches open up the valley below, and the camera pitches and yaws with the mountain. Six pistes are inspired by the public Roccaraso piste map, with their real start and finish altitudes:
+A drone-follow camera behind the skier shows the piste in 2.5D. It is not a road racer: the screen is built from the piste's real altitude profile. Crests hide the slope beyond them, steep pitches open up the valley below, and the camera pitches and yaws with the mountain.
 
-| Piste | Name | Altitudes | Character |
-|---|---|---|---|
-| E1 | Aremogna | 1850 → 1668 m | blue, gentle, crowded |
-| M1 | Monte Pratello | 2044 → 1745 m | blue, long |
-| D4 | Toppe-Aremogna | 2141 → 1668 m | red, long fast drop |
-| D1 | Toppe del Tesoro | 2141 → 1790 m | black, steep and short |
-| T8 | Pizzalto | 1850 → 1486 m | red, wooded |
-| K2 | Crete Rosse | 1830 → 1491 m | red, toward Lago d'Avoli |
+The six pistes are traced from the official Alto Sangro panoramic piste map ([docs/pistes.md](docs/pistes.md)). Each keeps the map's sequence of turns, pitches, traverses and gullies, its real start and finish altitudes, the forest on either side and the lifts it passes under:
+
+| Piste | Name | Altitudes | In game | What you ski |
+|---|---|---|---|---|
+| E1 | Aremogna | 1850 → 1668 m | 1.2 km, blue | Valle Verde to Piazzale Aremogna: the straight, wide boulevard |
+| M1 | Monte Pratello | 2040 → 1745 m | 2.5 km, blue | the panoramic ridge east from Esagono, then the hook down to Prato |
+| D4 | Toppe-Aremogna | 2141 → 1668 m | 2.4 km, red | summit ridge west, a hairpin, the banked C4-D4 forest track, the gap pitch to Aremogna |
+| D1 | Toppe del Tesoro | 2141 → 1850 m | 1.2 km, black | summit ridge east, the drop to G2, then the narrow rock-walled chute to Valle Verde |
+| T8 | Pizzalto | 1850 → 1484 m | 1.6 km, red | under the Pizzalto summit, the long diagonal face, round onto T2 |
+| K2 | Crete Rosse | 1830 → 1309 m | 2.4 km, red | forest S-bends from the Crete Rosse hut to Monte Pratello hut, then the P1 valley to Rivisondoli |
+
+Gully walls bank you back toward the bed and cost you speed as you climb them; go over the rim and you fall. Where the map shows open snowfields you can wander into deep powder; where it shows forest, the trees are waiting.
+
+![In-game ground plans and profiles of the six pistes](docs/piste-plans.png)
 
 Along the way you meet rifugi, chairlifts with moving chairs, snow cannons, moguls, ice sheets, kickers, snowcats and the after-Christmas crowd: wandering tourists, ski-school lines and seated snowboarders. Reach the valley before your skipass expires. Each checkpoint adds 5 s.
 
@@ -58,7 +64,7 @@ source $HOME/esp-idf/export.sh
 ./build.sh
 ```
 
-This writes `dist/skipass-madness-esp32c6.prg32`, `dist/skipass-madness-qemu.prg32` and, once the media in `assets/` exist, the Cartridge Store bundle `dist/skipass-madness-2.0.0.zip`.
+This writes `dist/skipass-madness-esp32c6.prg32`, `dist/skipass-madness-qemu.prg32` and, once the media in `assets/` exist, the Cartridge Store bundle `dist/skipass-madness-2.1.0.zip`. It regenerates `pistes.h` from the traces in `scripts/trace_pistes.py`; set `SKIPASS_MAP` to the map image (extracted with `pdfimages -j` from the piste map PDF) to resample forest and lift crossings too.
 
 ## Tests and media
 
@@ -66,12 +72,12 @@ This writes `dist/skipass-madness-esp32c6.prg32`, `dist/skipass-madness-qemu.prg
 sh tests/check_source.sh
 ```
 
-The script runs the source policy checks and the host harness in `tests/host/`, which compiles `game.c` against a stub API. The harness runs the autopilot down every piste and a sanitizer fuzz, and can render frames (`host render`, `host title`).
+The script runs the source policy checks (including that `pistes.h` matches `scripts/trace_pistes.py`) and the host harness in `tests/host/`, which compiles `game.c` against a stub API. The harness runs the autopilot down every piste and a sanitizer fuzz, and can render frames (`host render`, `host title`) or dump the course plans (`host plan`).
 
 Start a local [PRG32 Multiplayer Server](https://github.com/riscv-prg32/PRG32-Multiplayer-Server) on 127.0.0.1:8081 first. Then:
 
 - `python3 scripts/multiplayer_test.py --out <dir>` runs two QEMU consoles in the same room and checks that each one sees the other.
-- `python3 scripts/capture_media.py` records the 60-second QEMU preview. It writes `assets/preview.mp4` (H.264/AAC, as the Store requires), `assets/preview.mp3` (the same audio), the screenshot and the icon.
+- `python3 scripts/capture_media.py` records the 60-second QEMU preview (title, then K2 Crete Rosse into its forest gully). It writes `assets/preview.mp4` (H.264/AAC, as the Store requires), `assets/preview.mp3` (the same audio), the screenshot and the icon.
 
 QEMU reaches the server through a slirp `guestfwd` to the firmware's compiled server address, because the firmware stalls while it reconnects to a server it can't reach. See [docs/architecture.md](docs/architecture.md).
 
@@ -80,4 +86,4 @@ QEMU reaches the server through a slirp `guestfwd` to the firmware's compiled se
 - PRG32: https://github.com/riscv-prg32/PRG32
 - Roccaraso piste map: https://www.datocms-assets.com/57366/1660222120-roccaraso-piste.pdf
 
-Piste names, codes and altitudes follow the public map. The geometry is an arcade interpretation, not a navigation aid.
+Piste names, codes, altitudes and shapes follow the public map, read through a fitted perspective model and shortened to 62% for play. The courses are not a navigation aid.

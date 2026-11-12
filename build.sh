@@ -7,6 +7,14 @@ mkdir -p "$here/build" "$here/dist" "$here/store-bundle"
 # sprites.h is generated and committed; regenerate it when Pillow is available.
 if python3 -c "import PIL" 2>/dev/null; then python3 "$here/scripts/gen_sprites.py"
 else echo "Pillow not available in $(command -v python3): using the committed sprites.h"; fi
+# Piste tables from the map traces. With SKIPASS_MAP pointing at the map image
+# (pdfimages -j of the piste map PDF) forest and lift crossings are resampled;
+# without it the sampled data already in pistes.h are kept.
+if [ -n "${SKIPASS_MAP:-}" ] && python3 -c "import PIL" 2>/dev/null; then
+  python3 "$here/scripts/trace_pistes.py" --map "$SKIPASS_MAP"
+else
+  python3 "$here/scripts/trace_pistes.py" >/dev/null
+fi
 python3 "$here/scripts/generate_audio.py"
 python3 "$here/scripts/store_manifest.py"
 python3 "$sdk/tools/prg32audio_pack.py" "$here/assets/audio.json" --out "$here/build/skipass.audio"

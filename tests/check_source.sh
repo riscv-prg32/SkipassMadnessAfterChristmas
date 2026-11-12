@@ -26,10 +26,17 @@ grep -q 'prg32_palette_set' "$root/game.c" || fail "background palette"
 ! grep -q 'prg32_gfx_rect(' "$root/game.c" || fail "direct-colour rectangles"
 grep -q 'spr_24x32' "$root/sprites.h" || fail "generated skier sprites"
 
-# Real-inspired Roccaraso pistes.
-for piste in AREMOGNA 'MONTE PRATELLO' 'TOPPE DEL TESORO' PIZZALTO 'CRETE ROSSE'; do
-  grep -q "$piste" "$root/game.c" || fail "piste $piste"
+# Pistes traced from the Alto Sangro map: tables generated, never hand-edited.
+for piste in AREMOGNA 'MONTE PRATELLO' 'TOPPE-AREMOGNA' 'TOPPE DEL TESORO' PIZZALTO 'CRETE ROSSE'; do
+  grep -q "$piste" "$root/pistes.h" || fail "piste $piste"
 done
+grep -q '#include "pistes.h"' "$root/game.c" || fail "game uses the traced pistes"
+grep -q 'static void wall_band' "$root/game.c" || fail "gully walls"
+tmp_p=$(mktemp)
+cp "$root/pistes.h" "$tmp_p"
+python3 "$root/scripts/trace_pistes.py" --out "$tmp_p" >/dev/null
+cmp -s "$tmp_p" "$root/pistes.h" || { rm -f "$tmp_p"; fail "pistes.h is out of date with scripts/trace_pistes.py"; }
+rm -f "$tmp_p"
 
 # Slope physics.
 grep -q 'static void physics_step' "$root/game.c" || fail "physics step"
@@ -58,7 +65,7 @@ if command -v cc >/dev/null 2>&1; then
   trap 'rm -rf "$tmp"' EXIT
   san="-fsanitize=address,undefined"
   cc -std=c11 -O1 -g -Wall -Wextra -Werror $san -I"$root/tests/host" -o "$tmp/host" "$root/tests/host/host.c" 2>/dev/null ||
-    cc -std=c11 -O1 -Wall -Wextra -Werror -I"$root/tests/host" -o "$tmp/host" "$root/tests/host/host.c"
+    cc -std=c11 -O1 -Wall -Wextra -Werror -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -I"$root/tests/host" -o "$tmp/host" "$root/tests/host/host.c"
   "$tmp/host" sim | tee "$tmp/sim.txt"
   [ "$(wc -l < "$tmp/sim.txt")" -eq 6 ] || fail "autopilot did not finish all pistes"
   "$tmp/host" fuzz 120

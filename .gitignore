@@ -57,3 +57,4 @@ build/
 
 # Store staging copy (rebuilt by build.sh)
 store-bundle/
+.DS_Store

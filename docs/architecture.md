@@ -4,7 +4,7 @@
 
 ## Course model
 
-Each piste is a table of 10 m segments `{length, slope, bend, half-width}` (`SEGS`). `build_course` rescales the slopes so that the total drop matches the real start and finish altitudes (`TOP_M`, `BOT_M`), smooths them, and fills per-step tables at a 10 m `STEP`:
+`pistes.h` holds one generated table per piste (see [pistes.md](pistes.md)), one row per 10 m: drop, turn, half-width and an environment byte (forest density 0–3 and gully wall level 0–3 on each side). It also holds the lift crossings and huts. `build_course` reads it with a `switch` (portable cartridges cannot keep pointer tables), rescales the summed drop to the real start and finish altitudes (`TOP_M`, `BOT_M`) and fills the per-step tables at a 10 m `STEP`:
 
 | Table | Holds |
 |---|---|
@@ -13,6 +13,7 @@ Each piste is a table of 10 m segments `{length, slope, bend, half-width}` (`SEG
 | `c_phi` | bend angle |
 | `c_u`, `c_v` | world centreline, integrated from the bend angle |
 | `c_hw` | half-width |
+| `c_env` | forest and gully walls, per side |
 | `prof` | 64-point altitude profile for the HUD |
 
 `place_objects` uses a seed per piste, so every networked console sees the same layout.
@@ -26,6 +27,7 @@ Units are cm and cm/s, Q12 trigonometry, and angles in 1/16 degree. Sub-step acc
 - Drag `v²/k`, with separate values for upright, tuck and plough.
 - The turn rate is capped by a 13 m carving radius, with lower caps in a tuck, on ice and in the air.
 - Kickers and crests launch a ballistic flight. A hard or crossed landing is a fall.
+- Off the piste: a gully wall (bank 4 m, gully side 9 m, canyon wall 16 m high) turns the skis back toward the bed and takes speed as the skier climbs it; over the rim is a fall. Forest beyond the powder strip is a fall where the map shows dense trees; open snowfields are deep powder.
 
 The MAESTRO `autopilot()` scores lateral lines across the piste against every hazard in the next ~2 s, predicting where moving people will be, and takes the cheapest line. It drives the demo mode and the optional steering assist.
 
@@ -33,7 +35,8 @@ The MAESTRO `autopilot()` scores lateral lines across the piste against every ha
 
 - **Background:** sky gradient, the Maiella-like ridge, hills, valley bands and villages, shifted by camera yaw and pitch.
 - **Terrain:** 52 depth slices whose spacing grows geometrically. Each slice is projected from the camera behind and above the skier. A voxel-style `ymin` occlusion means crests hide the snow behind them.
-- **Objects:** trees, poles, banners, huts, lifts, snowcats, cannons, patches and people are gathered into a far-to-near draw list, and each item is clipped to the occlusion line of its slice.
+- **Gully walls:** between each pair of depth slices, each walled side is a quad from the wall foot up to the rim. It is drawn as row strips (coarser far away) in alternating snow or rock shades every 7 m, with forest or snow on the plateau beyond the rim. The bands go into the same draw list as the trees, so a pine on a rim is hidden by a nearer bend of the wall.
+- **Objects:** trees (as dense as the map's forest on that side, standing on the rim where there is a wall), poles, banners, huts, lifts, snowcats, cannons, patches and people are gathered into a far-to-near draw list, and each item is clipped to the occlusion line of its slice.
 - **Colour:** everything is indexed. Backgrounds use palette slots 8–15 and 232–255 set with `prg32_palette_set`. Sprites and text use the console colour cube.
 
 ## Audio

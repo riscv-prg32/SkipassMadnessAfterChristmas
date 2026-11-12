@@ -4,6 +4,7 @@
  *   host title <course> <out.ppm>                render the title screen
  *   host sim                                     autopilot time and falls per piste
  *   host fuzz <seconds>                          random input soak (use sanitizers)
+ *   host plan                                    course centrelines and profiles (CSV)
  *
  * keys: one character per 33 ms frame from: l r u d a b s . (none);
  * the last key repeats. Not part of the cartridge. */
@@ -132,10 +133,21 @@ int main(int argc, char **argv) {
           recover(); g.mode = PLAY; steps += 48;
         }
         steps++;
+        if (getenv("TRACE") && atoi(getenv("TRACE")) == c && steps % 60 == 0)
+          printf("  t %5.1f s %5d m v %3d km/h grade %3d%% hw %4d x %5d h %4d bend %4d env %02x\n", steps * 0.033, (int)(p.s / 100), p.v * 36 / 1000,
+                 lerp16(c_sin, p.s) * 100 / 4096, lerp16(c_hw, p.s), (int)p.x, p.h / 16, (lerp16(c_phi, p.s + 1000) - lerp16(c_phi, p.s)) / 16, c_env[p.s / STEP]);
         int k = p.v * 36 / 1000; if (k > maxk) maxk = k;
       }
       printf("%s %-17s %4d m drop %3d m  time %5.1f s  falls %d  top %d km/h  avg %d km/h  objects %d\n", PCODE[c], PNAME[c], (int)(c_len / 100),
              TOP_M[c] - BOT_M[c], steps * 0.033, g.crashes, maxk, (int)(c_len / 100 * 3.6 / (steps * 0.033)), nob);
+    }
+    return 0;
+  }
+  if (!strcmp(argv[1], "plan")) {
+    printf("course,sample,u_m,v_m,alt_m,half_width_m,env\n");
+    for (int c = 0; c < 6; c++) {
+      build_course(c);
+      for (int i = 0; i < c_n; i++) printf("%d,%d,%d,%d,%d,%d,%d\n", c, i, (int)(c_u[i] / 100), (int)(c_v[i] / 100), (int)(c_alt[i] / 100), c_hw[i] / 100, c_env[i]);
     }
     return 0;
   }

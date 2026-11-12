@@ -173,10 +173,12 @@ class Console:
                 return
             self.log.extend(d)
 
-    def keys(self, k: str, repeat: int = 1) -> None:
+    def keys(self, k: str, repeat: int = 1, gap: float = 0.1) -> None:
+        """Send k repeat times. A byte holds its button 120 ms, so repeats
+        0.1 s apart are one long press; use gap >= 0.3 for separate presses."""
         for _ in range(repeat):
             self.sock.sendall(k.encode())
-            time.sleep(0.1)
+            time.sleep(gap)
 
     def wait_for(self, text: bytes, seconds: float) -> bool:
         end = time.monotonic() + seconds
@@ -274,7 +276,7 @@ def main() -> int:
         g_fb = g_fb_address(args.firmware_dir / "PRG32.elf")
         consoles[0].screenshot(g_fb, args.out / "title-console1.png")
         for c in consoles:
-            c.keys("d", args.course)
+            c.keys("d", args.course, gap=0.35)
             time.sleep(0.4)
         for c in consoles:
             c.keys("h")

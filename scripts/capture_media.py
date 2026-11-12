@@ -39,12 +39,13 @@ CONSOLE_PORT = 4422
 # Keys follow the PRG32 QEMU keyboard mapper: d=RIGHT a=LEFT w=UP s=DOWN
 # h=A j=B Enter=SELECT. Every byte holds its button for 120 ms, so a hold
 # resends its keys every 100 ms. Timeline (seconds after recording starts):
-# title music and piste selection, D1 Toppe del Tesoro, countdown beeps,
-# then ~48 s of skiing with effects only: pole pushes, tucks, carves, brakes.
-# MAESTRO assist (on by default) steers whenever no Left/Right is held.
-# The run reaches ARRIVO before 60 s and ends on the winning fanfare.
+# title music and piste selection, K2 Crete Rosse, countdown beeps, then
+# ~53 s of skiing with effects only: pole pushes off the Crete Rosse hut,
+# tucks, carves and brakes down the banked forest corridor and the gully
+# S-bend traced from the piste map. MAESTRO assist (on by default) steers
+# whenever no Left/Right is held.
 TAPS: list[tuple[float, str]] = [
-    (1.2, "d"), (1.8, "d"), (2.4, "d"),   # E1 -> M1 -> D4 -> D1
+    (1.0, "d"), (1.4, "d"), (1.8, "d"), (2.2, "d"), (2.6, "d"),   # E1 -> M1 -> D4 -> D1 -> T8 -> K2
     (3.4, "h"),                           # start: countdown 3-2-1-VIA!
     (6.5, "j"), (7.0, "j"), (7.5, "j"), (8.0, "j"),   # pole pushes off the start
 ]
@@ -53,15 +54,11 @@ _t = 8.4
 _pattern = ["w", "d", "w", "a", "w", "s", "w", "wa", "w", "wd", "s", "w", "d", "a"]
 _i = 0
 while _t < 60.0:
-    if _t < 44.0:
-        keys = _pattern[_i % len(_pattern)]
-        span = 0.35 if keys in ("d", "a") else (0.7 if keys == "s" else (0.4 if len(keys) == 2 else 2.4))
-    else:   # final schuss: tuck, releasing it so MAESTRO can carve round the crowd
-        keys, span = ("w", 1.0) if _i % 2 else ("", 0.5)
+    keys = _pattern[_i % len(_pattern)]
+    span = 0.35 if keys in ("d", "a") else (0.7 if keys == "s" else (0.4 if len(keys) == 2 else 2.4))
     HOLDS.append((_t, min(60.0, _t + span), keys))
     _t += span + 0.15
     _i += 1
-TAPS += [(44.0 + 0.6 * _k, "j") for _k in range(24)]   # pole pushes over the finish flat
 SCRIPT = sorted(TAPS)
 
 

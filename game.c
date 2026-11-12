@@ -41,11 +41,11 @@
 #define CAM_BACK 820          /* camera distance behind the skier, cm */
 #define Y0 82                 /* vanishing line of a flat slope */
 #define STEP 1000             /* course sample spacing, cm (10 m) */
-#define MAXS 260              /* course samples incl. run-out */
+#define MAXS (PISTE_MAXN + RUNOUT + 2)   /* course samples incl. run-out */
 #define RUNOUT 45             /* flat samples after the finish */
 #define NSL 52                /* terrain depth slices */
 #define OBJ_MAX 220
-#define DL_MAX 200
+#define DL_MAX 320
 #define TREE_GAP 650          /* powder strip between piste edge and forest, cm */
 
 /* ------------------------------------------------------------ freestanding */
@@ -192,49 +192,41 @@ static void big(int x, int y, const char *s, int sc, uint8_t col, uint8_t shadow
 static void big_c(int y, const char *s, int sc, uint8_t col, uint8_t shadow) { big((W - big_w(s, sc)) / 2, y, s, sc, col, shadow); }
 
 /* ------------------------------------------------------------- the pistes
- * Six real-inspired runs of the Roccaraso / Alto Sangro area. Start and
- * finish altitudes follow the area piste map; segment slopes are relative
- * weights that the builder rescales to the real vertical drop. */
-typedef struct { uint8_t len10, slope; int8_t bend; uint8_t width; } seg_t;
-#define NSEG 10
-static const seg_t SEGS[6][NSEG] = {
-  /* E1 Pizzalto -> Aremogna: wide blue boulevard with pole-pushing flats */
-  {{12,6,0,40},{15,9,8,38},{10,3,0,34},{20,10,-10,40},{15,7,6,36},{18,11,0,44},{12,4,-6,36},{20,9,4,40},{14,8,0,46},{24,6,0,50}},
-  /* M1 Monte Pratello -> Prato: long rolling blue on the Rivisondoli side */
-  {{15,7,0,34},{20,10,8,32},{15,12,-6,30},{25,8,0,36},{20,11,10,32},{15,4,0,30},{25,10,-8,34},{20,12,4,32},{25,8,0,40},{20,5,0,48}},
-  /* D4 Toppe del Tesoro -> Aremogna: the long red from the summit */
-  {{10,8,0,30},{20,14,-8,28},{18,18,10,26},{15,11,0,30},{20,16,-12,26},{15,20,6,24},{20,13,0,30},{25,15,8,28},{25,12,-6,32},{20,8,0,44}},
-  /* D1 Toppe del Tesoro: the black, with the wall below the summit */
-  {{8,10,0,26},{12,20,8,24},{10,28,-4,22},{12,16,10,24},{14,24,-10,22},{10,14,0,26},{16,26,6,22},{12,18,-6,24},{14,12,0,28},{12,6,0,36}},
-  /* T8 Pizzalto -> P. Pizzalto: wooded red down to the Pizzalto car park */
-  {{12,9,0,30},{15,15,-6,28},{20,18,8,26},{14,12,0,28},{18,20,-10,24},{16,14,6,26},{20,17,-4,26},{15,11,0,30},{20,14,8,28},{20,7,0,42}},
-  /* K2 Crete Rosse -> Lago d'Avoli: red through the forest */
-  {{12,8,0,30},{18,13,10,28},{20,16,-6,26},{15,10,0,30},{20,18,8,24},{18,13,-10,26},{22,15,4,28},{15,9,0,30},{20,12,-6,30},{20,6,0,44}},
-};
-static const int16_t TOP_M[6] = {1850, 2044, 2141, 2141, 1850, 1830};
-static const int16_t BOT_M[6] = {1668, 1745, 1668, 1790, 1486, 1491};
-static const int16_t BEARING[6] = {200, 120, 230, 160, 250, 90};   /* initial view bearing, degrees */
-static const uint8_t DIFF[6] = {0, 0, 1, 2, 1, 1};
-static const char PCODE[6][3] = {"E1", "M1", "D4", "D1", "T8", "K2"};
-static const char PNAME[6][17] = {"AREMOGNA", "MONTE PRATELLO", "TOPPE-AREMOGNA", "TOPPE DEL TESORO", "PIZZALTO", "CRETE ROSSE"};
-static const char PFINISH[6][13] = {"P. AREMOGNA", "PRATO", "P. AREMOGNA", "VALLE VERDE", "P. PIZZALTO", "LAGO D'AVOLI"};
+ * Six runs of the Roccaraso / Alto Sangro area traced from the panoramic
+ * piste map by scripts/trace_pistes.py: real start/finish altitudes, the
+ * map's turns, pitches, gullies, forest and lift crossings, back-projected
+ * from the map's perspective to metres. See pistes.h. */
+#include "pistes.h"
 /* Skipass validity per piste in seconds (about 1.35x an expert autopilot). */
-static const uint16_t LIMIT_S[6] = {145, 180, 130, 90, 155, 125};
-static const char HUTN[12][15] = {"CHEZ NOUS", "TELECABINA", "PARADISO", "RIFUGIO", "VALLE VERDE", "CRETE ROSSE",
-                                  "ESAGONO", "PRATO", "MONTE PRATELLO", "FONTANILE", "LAGO D'AVOLI", "PIZZALTO"};
-/* Landmarks: course, sample (10 m), kind (0 hut, 1 lift), side, hut name. */
-static const uint8_t MARKS[][5] = {
-  {0, 40, 1, 0, 0}, {0, 70, 0, 1, 2}, {0, 110, 1, 0, 0}, {0, 150, 0, 0, 1},
-  {1, 6, 0, 0, 8}, {1, 90, 1, 0, 0}, {1, 120, 0, 1, 9}, {1, 192, 0, 1, 7},
-  {2, 4, 0, 1, 3}, {2, 60, 1, 0, 0}, {2, 100, 0, 0, 4}, {2, 150, 1, 0, 0}, {2, 182, 0, 1, 0},
-  {3, 4, 0, 0, 3}, {3, 45, 1, 0, 0}, {3, 85, 1, 0, 0}, {3, 114, 0, 1, 4},
-  {4, 5, 0, 1, 6}, {4, 55, 1, 0, 0}, {4, 115, 1, 0, 0}, {4, 163, 0, 0, 11},
-  {5, 28, 0, 1, 5}, {5, 80, 1, 0, 0}, {5, 140, 1, 0, 0}, {5, 172, 0, 0, 10},
-};
+static const uint16_t LIMIT_S[NPISTE] = {100, 270, 210, 110, 140, 165};
+#define PISTE_CASE(i, P) case i: *drop = P##_DROP[k]; *bend = P##_BEND[k]; *hw = P##_HW[k]; *env = P##_ENV[k]; break;
+static void piste_row(int c, int k, int *drop, int *bend, int *hw, int *env) {
+  switch (c) {
+    PISTE_CASE(0, E1) PISTE_CASE(1, M1) PISTE_CASE(2, D4) PISTE_CASE(3, D1) PISTE_CASE(4, T8) default: PISTE_CASE(5, K2)
+  }
+}
+/* Landmark i of piste c: huts first, then lift crossings. 0 when done. */
+#define MARK_CASE(i, P) case i: \
+    if (m < (int)(sizeof P##_HUTS / sizeof P##_HUTS[0])) { *k = P##_HUTS[m][0]; *name = P##_HUTS[m][1]; *side = P##_HUTS[m][2]; return 1; } \
+    m -= (int)(sizeof P##_HUTS / sizeof P##_HUTS[0]); \
+    if (m < P##_NLIFTS) { *k = P##_LIFTS[m]; *name = -1; *side = 0; return 1; } \
+    return 0;
+static int piste_mark(int c, int m, int *k, int *name, int *side) {
+  switch (c) {
+    MARK_CASE(0, E1) MARK_CASE(1, M1) MARK_CASE(2, D4) MARK_CASE(3, D1) MARK_CASE(4, T8) default: MARK_CASE(5, K2)
+  }
+}
 
 /* Course samples: altitude, world centreline, direction, slope, half width. */
 static int32_t c_alt[MAXS], c_u[MAXS], c_v[MAXS];
 static int16_t c_phi[MAXS], c_sin[MAXS], c_cos[MAXS], c_hw[MAXS];
+static uint8_t c_env[MAXS];   /* forest density and gully walls per side, see pistes.h */
+/* Gully walls: level 1 bank, 2 gully side, 3 canyon wall (height, horizontal run, cm). */
+static const int16_t WALL_H[4] = {0, 400, 900, 1600}, WALL_RUN[4] = {0, 500, 900, 1100};
+#define WALL_FOOT 150             /* flat snow between the piste edge and the wall foot */
+static int env_at(int32_t s) { int k = (int)(s / STEP); return c_env[k < 0 ? 0 : (k >= MAXS ? MAXS - 1 : k)]; }
+static int forest_of(int env, int side) { return (env >> (side > 0 ? 2 : 0)) & 3; }
+static int wall_of(int env, int side) { return (env >> (side > 0 ? 6 : 4)) & 3; }
 static uint8_t prof[64];
 static int c_n, c_total, c_course = -1;
 static int32_t c_len;
@@ -257,24 +249,20 @@ static void build_course(int c) {
   if (c == c_course) return;
   c_course = c;
   static int16_t raw[MAXS], bend[MAXS], wid[MAXS];
-  int n = 0;
-  for (int k = 0; k < NSEG; k++) {
-    const seg_t *sg = &SEGS[c][k];
-    for (int j = 0; j < sg->len10 && n < MAXS - RUNOUT - 1; j++, n++) {
-      raw[n] = (int16_t)(STEP * SIN_T[sg->slope] / SIN_T[90 - sg->slope]);   /* drop per 10 m at that slope */
-      bend[n] = (int16_t)(sg->bend * 16 / 10);
-      wid[n] = (int16_t)(sg->width * 50);
-    }
+  int n = PISTE_N[c] - 1;              /* steps; sample n is the finish */
+  for (int i = 0; i <= n; i++) {
+    int d, b, hw, env;
+    piste_row(c, i, &d, &b, &hw, &env);
+    raw[i] = (int16_t)(d * 10);        /* dm -> cm drop over the next 10 m */
+    bend[i] = (int16_t)(b * 2);        /* 1/8 deg -> 1/16 deg */
+    wid[i] = (int16_t)(hw * 25);       /* 25 cm units -> cm */
+    c_env[i] = (uint8_t)env;
   }
   c_n = n + 1;
   c_total = c_n + RUNOUT;
-  for (int i = n; i < c_total; i++) { raw[i] = (int16_t)(i < c_n + 4 ? raw[n - 1] / 2 : 0); bend[i] = 0; wid[i] = wid[n - 1] + 400; }
-  for (int pass = 0; pass < 2; pass++)   /* smooth breaks of slope, bends and width */
-    for (int i = 1; i < c_total - 1; i++) {
-      raw[i] = (int16_t)((raw[i - 1] + 2 * raw[i] + raw[i + 1]) / 4);
-      bend[i] = (int16_t)((bend[i - 1] + 2 * bend[i] + bend[i + 1]) / 4);
-      wid[i] = (int16_t)((wid[i - 1] + 2 * wid[i] + wid[i + 1]) / 4);
-    }
+  for (int i = c_n; i < c_total; i++) { raw[i] = (int16_t)(i < c_n + 4 ? raw[n - 1] / 2 : 0); bend[i] = 0; wid[i] = (int16_t)(wid[n] + 400); c_env[i] = 0; }
+  for (int i = 1; i < c_total - 1; i++)   /* soften the 1 dm quantisation of the drop */
+    raw[i] = (int16_t)((raw[i - 1] + 2 * raw[i] + raw[i + 1]) / 4);
   int32_t sum = 0;
   for (int i = 0; i < n; i++) sum += raw[i];
   int32_t drop = (int32_t)(TOP_M[c] - BOT_M[c]) * 100;
@@ -290,7 +278,7 @@ static void build_course(int c) {
     alt -= d;
     u += icos(phi) * STEP / 4096;
     v += isin(phi) * STEP / 4096;
-    phi += bend[i];
+    if (i + 1 < c_total) phi += bend[i + 1];   /* the map's turn arriving at the next sample */
   }
   c_len = (int32_t)(c_n - 1) * STEP;
   for (int i = 0; i < 64; i++) {
@@ -426,17 +414,19 @@ static void place_objects(int c) {
   nob = 0;
   seed = 0x5a17u + (uint32_t)c * 977u;   /* identical layout on every networked console */
   add_obj(900, 0, OB_START);
-  for (unsigned m = 0; m < sizeof MARKS / sizeof MARKS[0]; m++) {
-    if (MARKS[m][0] != c) continue;
-    int32_t s = (int32_t)MARKS[m][1] * STEP;
-    int hw = c_hw[MARKS[m][1]];
-    if (MARKS[m][2] == 1) add_obj(s, 0, OB_LIFT);
-    else { add_obj(s, (MARKS[m][3] ? 1 : -1) * (hw + 1300), OB_HUT); ob[nob - 1].name = MARKS[m][4]; }
+  int mk, mname, mside;
+  for (int m = 0; piste_mark(c, m, &mk, &mname, &mside); m++) {   /* huts and lift crossings from the map */
+    int32_t s = (int32_t)mk * STEP;
+    int hw = c_hw[mk];
+    if (mname < 0) add_obj(s, 0, OB_LIFT);
+    else { add_obj(imax(s, 600), (mside ? 1 : -1) * (hw + 1300), OB_HUT); ob[nob - 1].name = (uint8_t)mname; }
   }
   int dens = DIFF[c] == 0 ? 230 : (DIFF[c] == 1 ? 150 : 90);
   for (int k = 9; k < c_n - 6; k++) {
     int32_t s = (int32_t)k * STEP + (int32_t)(rnd() % 600);
     int hw = c_hw[k];
+    int gully = wall_of(c_env[k], -1) >= 2 && wall_of(c_env[k], 1) >= 2;
+    if (gully && rnd() % 4) continue;               /* few people stop in a narrow gully */
     int lat = (int)(rnd() % (unsigned)(2 * hw - 300)) - hw + 150;
     unsigned r = rnd() % 1000;
     if (k % 30 == 0) { add_obj((int32_t)k * STEP, 0, OB_CHECK); continue; }
@@ -557,7 +547,7 @@ static uint32_t autopilot(void) {
   int vmax = DIFF[g.course] == 2 ? 92 : (DIFF[g.course] == 1 ? 86 : 74);
   if (kmh > vmax + 6) in |= PRG32_BTN_DOWN;
   else if (kmh < vmax && absi(p.h - want) < 64 && !ap_avoid) in |= PRG32_BTN_UP;
-  if (p.v < 450 && g.now >= g.push_ready) in |= PRG32_BTN_B;
+  if ((p.v < 450 || (p.v < 700 && lerp16(c_sin, p.s) < 330)) && g.now >= g.push_ready) in |= PRG32_BTN_B;   /* skate and pole the flats */
   return in;
 }
 
@@ -658,8 +648,19 @@ static void physics_step(uint32_t in, uint32_t press) {
       sfx(CH_THUD, I_THUD, 30, clampi(120 + impact / 6, 120, 255), 0);
     }
   }
-  /* Forest beyond the powder strip, hazards, checkpoints, huts. */
-  if (absi((int)p.x) > hw + TREE_GAP && !p.air) { crash(2); p.x = sgn((int)p.x) * (hw - 300); return; }
+  /* Off the piste: a gully wall banks the skier back toward the bed, losing
+   * speed as it climbs; beyond its top, or into the forest, it is a fall.
+   * Open snowfields (no forest on the map) are deep powder. */
+  int side = sgn((int)p.x), env = env_at(p.s), out = absi((int)p.x) - hw;
+  int wl = wall_of(env, side), fo = forest_of(env, side);
+  if (wl && out > WALL_FOOT && !p.air) {
+    int up = out - WALL_FOOT;
+    if (up > WALL_RUN[wl]) { crash(5); p.x = side * (hw - 300); return; }
+    p.h -= side * clampi(up / 10 + 8, 8, 60);              /* the bank turns the skis back */
+    p.v -= (int)((int32_t)p.v * up * WALL_H[wl] / WALL_RUN[wl] / 60000);
+    p.scrape += 60;
+  } else if (!wl && !p.air && fo && out > TREE_GAP + (fo == 1 ? 900 : 0)) { crash(2); p.x = side * (hw - 300); return; }
+  else if (!wl && !fo && out > 2600) { p.x = side * (hw + 2600); p.h -= side * 40; }
   for (int i = 0; i < nob; i++) {
     obj_t *o = &ob[i];
     int32_t ds = o->s - p.s;
@@ -1154,10 +1155,58 @@ static void lift(int32_t s, int hw) {
   }
 }
 
+/* One band of gully wall between depth slice i (far) and i-1 (near), both
+ * sides: the face from the wall foot up to the rim, the rim and the forest
+ * or snow on the plateau beyond, drawn in strips of a few rows. */
+static void wall_band(int i) {
+  int32_t s0 = sl_s[i], s1 = sl_s[i - 1];
+  int e0 = env_at(s0), e1 = env_at(s1);
+  int hw0 = lerp16(c_hw, s0), hw1 = lerp16(c_hw, s1);
+  int rib = (int)((s0 / 700) & 1);       /* alternate shades every 7 m, like the piste */
+  for (int side = -1; side <= 1; side += 2) {
+    int w0 = wall_of(e0, side), w1 = wall_of(e1, side);
+    if (!w0 && !w1) continue;
+    int bx0, by0, tx0, ty0, bx1, by1, tx1, ty1;
+    if (!project(s0, side * (hw0 + WALL_FOOT), 0, &bx0, &by0) || !project(s1, side * (hw1 + WALL_FOOT), 0, &bx1, &by1)) continue;
+    project(s0, side * (hw0 + WALL_FOOT + WALL_RUN[w0]), WALL_H[w0], &tx0, &ty0);
+    project(s1, side * (hw1 + WALL_FOOT + WALL_RUN[w1]), WALL_H[w1], &tx1, &ty1);
+    int lvl = imax(w0, w1);
+    uint8_t face;
+    if (lvl >= 3) face = side < 0 ? (rib ? P_SHADOW : P_MOGUL) : (rib ? P_FAR : P_SHADOW);     /* rock and snow */
+    else face = side < 0 ? (rib ? P_POWDER2 : P_EDGE) : (rib ? P_EDGE : P_SHADOW);            /* snow banks */
+    int fo = forest_of(e1, side);
+    uint8_t top = fo >= 2 ? P_FOREST2 : (fo ? P_FORESTFAR : P_POWDER);
+    int ya = imax(imin(ty0, ty1), 0), yb = imin(imax(by0, by1), clip_y);
+    int stepy = clampi((yb - ya) / 24, sl_f[i] > 2500 ? 2 : 1, 4);   /* coarser far away */
+    for (int y = ya; y < yb; y += stepy) {
+      int yc = y + stepy / 2;
+      /* The band is the quad rim0-foot0-foot1-rim1: inside it is bounded by the
+       * far cross-section and then the foot line, outside by the rim line and
+       * then the near cross-section. */
+      int inner, rim;
+      if (yc < by0) inner = by0 > ty0 ? tx0 + (bx0 - tx0) * (yc - ty0) / (by0 - ty0) : bx0;
+      else inner = by1 > by0 ? bx0 + (bx1 - bx0) * (yc - by0) / (by1 - by0) : bx1;
+      if (yc < ty0) inner = tx0;
+      if (yc < ty1) rim = ty1 > ty0 ? tx0 + (tx1 - tx0) * (yc - ty0) / (ty1 - ty0) : tx1;
+      else rim = by1 > ty1 ? tx1 + (bx1 - tx1) * (yc - ty1) / (by1 - ty1) : bx1;
+      int hgt = imin(stepy, yb - y);
+      if (side < 0) {
+        inner = clampi(inner, 0, W); rim = clampi(rim, 0, inner);
+        if (rim > 0 && yc < ty1) box(0, y, rim, hgt, top);
+        if (inner > rim) box(rim, y, inner - rim, hgt, face);
+      } else {
+        inner = clampi(inner, 0, W); rim = clampi(rim, inner, W);
+        if (rim < W && yc < ty1) box(rim, y, W - rim, hgt, top);
+        if (rim > inner) box(inner, y, rim - inner, hgt, face);
+      }
+    }
+  }
+}
+
 typedef struct { int32_t f; int16_t x, y, ppm, clip; uint8_t kind, a; int16_t b; } dl_t;
 static dl_t dl[DL_MAX];
 static int ndl;
-enum { D_TREE = 100, D_POLE, D_PEER, D_PLAYER };
+enum { D_TREE = 100, D_POLE, D_PEER, D_PLAYER, D_WALL };
 static void dl_add(int32_t f, int x, int y, int kind, int a, int b, int32_t s) {
   if (ndl >= DL_MAX || f <= 0) return;
   if (x < -400 || x > W + 400) return;
@@ -1177,17 +1226,30 @@ static void gather(void) {
       int32_t s = (int32_t)k * STEP + (int32_t)(h % 700);
       int x, y;
       int32_t f;
-      if ((h >> 10) % 100 < 80) {
-        f = project(s, side * (hw + TREE_GAP + 150 + (int)((h >> 3) % 300)), 0, &x, &y);
+      /* Forest as dense as on the map; on a gully side the trees stand on the rim. */
+      static const uint8_t TREE_P[4] = {10, 45, 80, 96};
+      int env = c_env[k], fo = forest_of(env, side), wl = wall_of(env, side);
+      int lat = wl ? hw + WALL_FOOT + WALL_RUN[wl] + 100 : hw + TREE_GAP + 150;
+      int th = wl ? WALL_H[wl] : 0;
+      if ((int)((h >> 10) % 100) < TREE_P[fo]) {
+        f = project(s, side * (lat + (int)((h >> 3) % 300)), th, &x, &y);
         dl_add(f, x, y, D_TREE, (uint8_t)(7 + (h >> 20) % 5), 0, s);
       }
-      if (k < (int)(cam.s / STEP) + 18 && ((h >> 14) & 1)) {
-        f = project(s + 300, side * (hw + TREE_GAP + 700 + (int)((h >> 5) % 500)), 0, &x, &y);
+      if (fo >= 2 && k < (int)(cam.s / STEP) + 18 && ((h >> 14) & 1)) {
+        f = project(s + 300, side * (lat + 550 + (int)((h >> 5) % 500)), th, &x, &y);
         dl_add(f, x, y, D_TREE, (uint8_t)(8 + (h >> 22) % 4), 0, s + 300);
+      }
+      if (wl >= 2 && fo && ((h >> 16) & 3) == 0) {     /* a pine clinging to the gully side */
+        f = project(s + 500, side * (hw + WALL_FOOT + WALL_RUN[wl] / 2), WALL_H[wl] / 2, &x, &y);
+        dl_add(f, x, y, D_TREE, (uint8_t)(5 + (h >> 24) % 3), 0, s + 500);
       }
       if (k % 2 == 0 && k < c_n) { f = project((int32_t)k * STEP, side * (hw + 40), 0, &x, &y); dl_add(f, x, y, D_POLE, (uint8_t)diffc, 0, (int32_t)k * STEP); }
     }
   }
+  for (int i = 1; i < NSL; i++)   /* gully wall bands between depth slices */
+    if (sl_f[i] && sl_f[i - 1] && (wall_of(env_at(sl_s[i]), -1) || wall_of(env_at(sl_s[i]), 1) ||
+                                  wall_of(env_at(sl_s[i - 1]), -1) || wall_of(env_at(sl_s[i - 1]), 1)))
+      dl_add(sl_f[i - 1] + 1, 160, sl_y[i - 1], D_WALL, (uint8_t)i, 0, sl_s[i - 1]);
   for (int i = 0; i < nob; i++) {
     obj_t *o = &ob[i];
     if (o->s < cam.s + 200 || o->s > cam.s + 40000) continue;
@@ -1224,10 +1286,11 @@ static void draw_items(void) {
   for (int i = 0; i < ndl; i++) {
     dl_t *e = &dl[i];
     clip_y = e->clip;
-    if (e->y - 2 > clip_y && e->kind != OB_LIFT && e->kind != OB_CHECK && e->kind != OB_FINISH && e->kind != OB_START) continue;
+    if (e->y - 2 > clip_y && e->kind != D_WALL && e->kind != OB_LIFT && e->kind != OB_CHECK && e->kind != OB_FINISH && e->kind != OB_START) continue;
     obj_t *o = &ob[e->b];
     switch (e->kind) {
       case D_TREE: tree(e->x, e->y, e->ppm, e->a); break;
+      case D_WALL: wall_band(e->a); break;
       case D_POLE: pole(e->x, e->y, e->ppm, e->a); break;
       case D_PEER: {
         int x = e->x, y = e->y;
@@ -1430,8 +1493,8 @@ void skipass_madness_draw(void) {
     big_c(52, b, 5, YELLOW, BLACK);
     txt_c(100, PNAME[g.course], WHITE, HUDC);
   } else if (g.mode == CRASH) {
-    static const char why[5][12] = {"WIPEOUT!", "BAD LANDING", "INTO TREES!", "SNOWCAT!", "COLLISION!"};
-    int w = clampi(g.crash_reason, 0, 4);
+    static const char why[6][12] = {"WIPEOUT!", "BAD LANDING", "INTO TREES!", "SNOWCAT!", "COLLISION!", "GULLY WALL!"};
+    int w = clampi(g.crash_reason, 0, 5);
     box(80, 64, 160, 20, HUDC);
     txt_c(70, why[w], ORANGE, HUDC);
   } else if (g.mode == WIN) results(1);
